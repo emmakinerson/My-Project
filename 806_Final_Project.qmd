@@ -1,0 +1,8 @@
+---
+title: "806 Final Project"
+author: "Emma Kinerson"
+format: html
+editor: visual
+---
+
+Paper Idea: Using data from undergraduate student in the lab. Exploring the role of seasonal microbes on plant growth. Looking to analyze data from frond optical density under the different experimental conditions.
