@@ -6,3 +6,21 @@ editor: visual
 ---
 
 Paper Idea: Using data from undergraduate student in the lab. Exploring the role of seasonal microbes on plant growth. Looking to analyze data from frond optical density under the different experimental conditions.
+
+Introduction:
+
+Methods:
+
+1.  Microbe Collection:
+
+    Microbes were sampled from two different locations during different seasons. Seven sample collections were completed at the La Roche sample site, and eight sample collections were completed at the Thompson Farm site. Samples were collected at the edge of a body of water using sterilized metal spatulas . Collection tubes were rinsed in the body of water three times before being used to collect duckweed and the surrounding water.
+
+2.  Duckweed Line:
+
+    Isogenic duckweed lines were created using duckweed from each respective site. Single fronds from each site were placed into twenty four well plates and allowed to asexually reproduce. From these two lines, axenic cultures were created for each respective line. These cultures were created by sterilizing the duckweed using a 1% bleach solution for one minute and thirty seconds. Following the bleach sterilization, the plants were rinsed three times with sterile water. The first rinse lasted forty five seconds with the following two rinses lasting ten minutes each. The sterile duckweed was then placed into sterile Krazčič media (K media) for each respective isogenic line. The duckweed within each new axenic culture were then plated on sterile enriched yeast mannitol media to test for microbe growth to ensure sterilization.
+
+3.  Inoculation:
+
+4.  Experiment Design:
+
+5.  Statistical Tests:
