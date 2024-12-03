@@ -1,0 +1,391 @@
+---
+title: "Data Analysis, Undergrad Plate Data"
+author: "Emma Kinerson"
+format: html
+editor: visual
+---
+
+```{r}
+library(readxl)
+library(tidyverse)
+library(dplyr)
+library(ggplot2)
+library(car)
+library(lmerTest)
+library(emmeans)
+library(ggpubr)
+
+my_path <- "C:/Users/emmae/Documents/Undergrad Plate Data- OBrien_combined.xlsx"
+data <- read_excel(my_path)
+
+```
+
+```{r}
+long_data <- data %>%
+  pivot_longer(cols = `1`:`12`,            # Select all columns with OD values (1-12)
+               names_to = "Column",        # Create a new column for the column number
+               values_to = "OD_values") %>%  # New column for OD values
+  mutate(Well_ID = paste(...2, Column, sep = ""))  # Combine row and column to form Well_ID
+```
+
+```{r}
+my_path_2 <- "C:/Users/emmae/Documents/Plate_setup_undergrad_data_Obrien.xlsx"
+plate_setup <- read_excel(my_path_2)
+
+row_mapping <- c("1" = "A", "2" = "B", "3" = "C", "4" = "D", 
+                 "5" = "E", "6" = "F", "7" = "G", "8" = "H")
+plate_setup <- plate_setup %>% 
+  mutate(
+    Row = row_mapping[as.character(Row)],  # Convert Row numbers to letters using mapping
+    Well_ID = paste0(Row, Col)          # Concatenate Row and Column to form Well_ID
+  )
+
+plate_setup <- plate_setup %>% 
+   rename(`Plate #` = Plate)
+
+```
+
+```{r}
+combined_data <- left_join(long_data, plate_setup, by = c("Well_ID", "Plate #"))
+
+combined_data$...2 <- NULL
+combined_data$Col <- NULL
+```
+
+```{r}
+#getting rid of the unknown blanks
+combined_data_no_water <- combined_data %>%
+  filter(Micr != "Water", Plant != "Water")
+```
+
+```{r}
+#Getting Rid of Outliers Read 1
+threshold <- 1.0  # Set your threshold value
+
+# Filter out rows where OD is greater than the threshold
+filtered_combined_NW_1 <- combined_data_no_water %>%
+  filter(OD_values <= threshold, Read == "Read 1:450")
+```
+
+```{r}
+#Getting Rid of Outliers Read 2
+threshold <- 1.0  # Set your threshold value
+
+# Filter out rows where OD is greater than the threshold
+filtered_combined_NW_2 <- combined_data_no_water %>%
+  filter(OD_values <= threshold, Read == "Read 2:600")
+```
+
+```{r}
+mean_OD_seasons <- filtered_combined_NW_1 %>% 
+  group_by(Season) %>% 
+  summarise(mean_OD = mean(OD_values, na.rm = TRUE))
+```
+
+```{r}
+exp_group_summary_read_1 <- filtered_combined_NW_1 %>%
+  group_by(Read, Plant, Micr, Season) %>%
+  summarise(
+    mean_OD = mean(OD_values),
+    sd_OD = sd(OD_values),
+    min_OD = min(OD_values),
+    max_OD = max(OD_values))
+```
+
+Take out Control
+
+```{r}
+ggplot() +
+  geom_point(data = exp_group_summary_read_1, aes(x = Micr, y = mean_OD, color = Season), 
+             shape = 18, size = 4) +
+  geom_errorbar(data = exp_group_summary_read_1, aes(x = Micr, ymin = mean_OD - sd_OD, ymax = mean_OD + sd_OD), 
+                width = 0.2) +
+  
+  facet_wrap(~ Plant, scales = "free_x") +
+  labs(title = "Experimental Group Summary of OD Values",
+       x = "Microbe",
+       y = "Mean OD Value",
+       color = "Season") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+```{r}
+exp_group_summary_read_2 <- filtered_combined_NW_2 %>%
+  group_by(Read, Plant, Micr, Season) %>%
+  summarise(
+    mean_OD = mean(OD_values),
+    sd_OD = sd(OD_values),
+    min_OD = min(OD_values),
+    max_OD = max(OD_values))
+```
+
+```{r}
+ggplot() +
+  geom_point(data = exp_group_summary_read_2, aes(x = Micr, y = mean_OD, color = Season), 
+             shape = 18, size = 4) +
+  geom_errorbar(data = exp_group_summary_read_2, aes(x = Micr, ymin = mean_OD - sd_OD, ymax = mean_OD + sd_OD), 
+                width = 0.2) +
+  
+  facet_wrap(~ Plant, scales = "free_x") +
+  labs(title = "Experimental Group Summary of Mean OD Values",
+       x = "Microbe",
+       y = "Mean OD Value",
+       color = "Season") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+```{r}
+library(multcomp)
+library(car)
+
+qqPlot(filtered_combined_NW_1$OD_values)
+qqPlot(filtered_combined_NW_2$OD_values)
+```
+
+```{r}
+hist(filtered_combined_NW_1$OD_values)
+hist(filtered_combined_NW_2$OD_values)
+```
+
+```{r}
+ggplot(data = filtered_combined_NW_2, mapping = aes(x = Micr, y = OD_values)) +
+  geom_boxplot() +  # Add boxplot
+  geom_jitter(aes(color = Season), position = position_jitter(width = 0.2), size = 2, alpha = 0.6) +  # Layer plant data
+  labs(title = "Boxplot of OD Values",
+       x = "Microbe",
+       y = "OD Value",
+       color = "Season") +
+  theme_minimal()
+```
+
+```{r}
+#getting the mean OD values for the data without the blanks 
+exp_group_summary_read1 <- filtered_combined_NW_1 %>%
+  group_by(Plant, Micr, Season) %>%
+  summarise(
+    mean_OD = mean(OD_values),
+    sd_OD = sd(OD_values),
+    min_OD = min(OD_values),
+    max_OD = max(OD_values))
+
+```
+
+```{r}
+hist(log(filtered_combined_NW_1$OD_values))
+```
+
+```{r}
+hist(log(filtered_combined_NW_2$OD_values))
+```
+
+```{r}
+shapiro.test(log(filtered_combined_NW_1$OD_values))
+```
+
+```{r}
+shapiro.test(log(filtered_combined_NW_2$OD_values))
+```
+
+```{r}
+shapiro.test(filtered_combined_NW_1$OD_values)
+```
+
+```{r}
+shapiro.test(filtered_combined_NW_2$OD_values)
+```
+
+```{r}
+#Linear mixed model for Read 1 with control still added in 
+library(lme4)
+lmm_result_read1 <- lmer(OD_values ~ Season + Plant + (1| rep), data = filtered_combined_NW_1)
+summary(lmm_result_read1)
+
+```
+
+```{r}
+plot(lmm_result_read1)
+qqnorm(residuals(lmm_result_read1))
+qqline(residuals(lmm_result_read1))
+```
+
+```{r}
+#Linear mixed model for Read 2 with control still there 
+lmm_result_read2 <- lmer(OD_values ~ Season + Plant + (1| rep), data = filtered_combined_NW_2)
+summary(lmm_result_read2)
+```
+
+```{r}
+plot(lmm_result_read2)
+qqnorm(residuals(lmm_result_read2))
+qqline(residuals(lmm_result_read2))
+```
+
+```{r}
+#READ 1 LOG TRANSFORM
+# Apply log transformation to the OD values
+filtered_combined_NW_1$log_OD_values <- log(filtered_combined_NW_1$OD_values)
+
+# Run the linear mixed model with the log-transformed data
+lmm_result_log_read1 <- lmer(log_OD_values ~ Season + Plant + (1| rep), data = filtered_combined_NW_1)
+
+# Summarize the model results
+summary(lmm_result_log_read1)
+```
+
+```{r}
+AIC(lmm_result_read1, lmm_result_log_read1)
+```
+
+```{r}
+# Apply log transformation to the OD values
+filtered_combined_NW_2$log_OD_values <- log(filtered_combined_NW_2$OD_values)
+
+# Run the linear mixed model with the log-transformed data
+lmm_result_log_read2 <- lmer(log_OD_values ~ Season + Plant + (1| rep), data = filtered_combined_NW_2)
+
+# Summarize the model results
+summary(lmm_result_log_read2)
+plot(lmm_result_log_read2)
+```
+
+```{r}
+AIC(lmm_result_read2, lmm_result_log_read2)
+```
+
+```{r}
+plot(residuals(lmm_result_log_read2))
+qqnorm(residuals(lmm_result_log_read2))
+qqline(residuals(lmm_result_log_read2))
+```
+
+```{r}
+# Calculate estimated marginal means (EMMs)
+emm_season_read2 <- emmeans(lmm_result_log_read2, ~ Season)
+
+# Perform pairwise comparisons with Tukey adjustment
+tukey_results_season_read2 <- pairs(emm_season_read2, adjust = "tukey")
+print(tukey_results_season_read2)
+```
+
+```{r}
+# Calculate estimated marginal means (EMMs)
+emm_plant_read2 <- emmeans(lmm_result_log_read2, ~ Plant)
+
+# Perform pairwise comparisons with Tukey adjustment
+tukey_results_plant_read2 <- pairs(emm_plant_read2, adjust = "tukey")
+print(tukey_results_plant_read2)
+```
+
+```{r}
+# Perform pairwise Wilcoxon test
+wilcox_results <- pairwise.wilcox.test(
+  x = filtered_combined_NW_2$log_OD_values,        # Numeric variable
+  g = fil$Season,        # Grouping variable (factor)
+  p.adjust.method = "BH"  # Adjust for multiple comparisons (e.g., Benjamini-Hochberg)
+)
+
+# View results
+print(wilcox_results)
+```
+
+
+```{r}
+season_mean_summary <- filtered_combined_NW_2 %>% 
+  group_by(Season) %>% 
+  summarise(
+    mean_log_OD = mean(log(OD_values)),
+    sd_log_OD = sd(log(OD_values)),
+    min_log_OD = min(log(OD_values)),
+    max_log_OD = max(log(OD_values))
+  )
+
+ggplot() +
+  geom_point(data = season_mean_summary, aes(x = Season, y = mean_log_OD, color = Season), 
+             shape = 18, size = 4) +
+  geom_errorbar(data = season_mean_summary, aes(x = Season, ymin = mean_log_OD - sd_log_OD, ymax = mean_log_OD + sd_log_OD), 
+                width = 0.2)  +
+  labs(title = "Mean Log OD Values by Season",
+       x = "Season",
+       y = "Log OD Values",
+       color = "Season") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))+
+  geom_signif(comparisons = list(c("Summer", "Control")), 
+              map_signif_level=TRUE)
+
+
+```
+
+```{r}
+boxplot(residuals(lmm_result_log_read2), main = "Residuals Boxplot")
+outliers <- boxplot.stats(residuals(lmm_result_log_read2))$out
+outliers
+```
+
+```{r}
+boxplot(residuals(lmm_result_read2), main = "Residuals Boxplot")
+outliers_nonlog <- boxplot.stats(residuals(lmm_result_read2))$out
+outliers
+```
+
+```{r}
+combined_data_NW_NOut_wider <- combined_data_no_water %>%
+  filter(OD_values <= threshold) %>% 
+  pivot_wider(
+    names_from = Read,  # This will use the Wavelength column for new column names
+    values_from = OD_values)   # This will fill the new columns with the corresponding OD values
+```
+
+```{r}
+# Boxplot comparing OD450 and OD600 from your reshaped data
+boxplot(combined_data_NW_NOut_wider$`Read 1:450`, combined_data_NW_NOut_wider$`Read 2:600`,
+  names = c("OD450", "OD600"),  # Naming the x-axis
+  main = "Comparison of OD450 and OD600",    # Title of the plot
+  ylab = "Optical Density",                  # Label for the y-axis
+  col = c("lightblue", "lightgreen")         # Optional: Colors for each box
+)
+
+# Scatterplot for visualizing the relationship between OD450 and OD600
+plot(combined_data_NW_NOut_wider$`Read 1:450`, combined_data_NW_NOut_wider$`Read 2:600`, main = "OD450 vs OD600", xlab = "OD450", ylab = "OD600")
+abline(lm(`Read 1:450` ~ `Read 2:600`, data = combined_data_NW_NOut_wider), col = "red") # Add regression line
+```
+
+```{r}
+wilcox_test_result <- wilcox.test(combined_data_NW_NOut_wider$`Read 1:450`, combined_data_NW_NOut_wider$`Read 2:600`, paired = TRUE)
+
+# View results
+print(wilcox_test_result)
+```
+
+```{r}
+cor.test(combined_data_NW_NOut_wider$`Read 1:450`, combined_data_NW_NOut_wider$`Read 2:600`, method = "spearman")
+```
+
+```{r}
+ggplot(combined_data_NW_NOut_wider, aes(x = Plant, y = Season, fill = `Read 2:600`)) +
+  geom_tile(color = "black") +  # Add color tiles with white borders
+  scale_fill_gradient(low = "white", high = "darkblue", 
+                      name = "Optical Density") +  # Color scale
+  theme_minimal() +  # Use a minimal theme
+  labs(title = "Heatmap of Optical Density by Season and Location",
+       x = "Location",
+       y = "Season") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))  # Rotate x-axis labels
+```
+
+```{r}
+library(leaflet)
+
+  leaflet() %>% 
+  addTiles() %>% 
+  # Add marker for Thompson Farm with a label
+  addLabelOnlyMarkers(lng = -70.94978753239516, lat = 43.1104921981106770,
+                      label = "Thompson Farm", 
+                      labelOptions = labelOptions(noHide = TRUE, direction = "top")) %>%
+  # Add marker for La Roche with a label
+  addLabelOnlyMarkers(lng =  -70.9460138783696, lat = 43.11948257344687,
+                      label = "La Roche", 
+                      labelOptions = labelOptions(noHide = TRUE, direction = "top"))
+```

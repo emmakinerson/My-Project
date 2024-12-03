@@ -1,24 +1,120 @@
 ---
-title: "806 Final Project"
+title: "Seasonal Microbe Effect on Duckweed"
 author: "Emma Kinerson"
-format: html
+format: pdf
+fig_caption: true
 editor: visual
 ---
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+library(readxl)
+library(tidyverse)
+library(dplyr)
+library(ggplot2)
+library(car)
+library(lmerTest)
+library(broom.mixed)
+library(webshot)
+library(htmlwidgets)
+library(kableExtra)
+library(knitr)
+library(ggsignif)
+library(emmeans)
+library(ggpubr)
 
-Paper Idea: Using data from undergraduate student in the lab. Exploring the role of seasonal microbes on plant growth. Looking to analyze data from frond optical density under the different experimental conditions.
+my_path <- "C:/Users/emmae/Documents/Undergrad Plate Data- OBrien_combined.xlsx"
+data <- read_excel(my_path)
+```
+
+```{r, echo=FALSE}
+long_data <- data %>%
+  pivot_longer(cols = `1`:`12`,            # Select all columns with OD values (1-12)
+               names_to = "Column",        # Create a new column for the column number
+               values_to = "OD_values") %>%  # New column for OD values
+  mutate(Well_ID = paste(...2, Column, sep = ""))  # Combine row and column to form Well_ID
+```
+
+```{r, echo=FALSE}
+my_path_2 <- "C:/Users/emmae/Documents/Plate_setup_undergrad_data_Obrien.xlsx"
+plate_setup <- read_excel(my_path_2)
+
+row_mapping <- c("1" = "A", "2" = "B", "3" = "C", "4" = "D", 
+                 "5" = "E", "6" = "F", "7" = "G", "8" = "H")
+plate_setup <- plate_setup %>% 
+  mutate(
+    Row = row_mapping[as.character(Row)],  # Convert Row numbers to letters using mapping
+    Well_ID = paste0(Row, Col)          # Concatenate Row and Column to form Well_ID
+  )
+
+plate_setup <- plate_setup %>% 
+   rename(`Plate #` = Plate)
+
+```
+
+```{r, echo=FALSE}
+combined_data <- left_join(long_data, plate_setup, by = c("Well_ID", "Plate #"))
+
+combined_data$...2 <- NULL
+combined_data$Col <- NULL
+```
+
+```{r, echo=FALSE}
+#getting rid of the unknown blanks
+combined_data_no_water <- combined_data %>%
+  filter(Micr != "Water", Plant != "Water")
+```
+
+```{r, echo=FALSE}
+#Getting Rid of Outliers Read 1
+threshold <- 1.0  # Set your threshold value
+
+# Filter out rows where OD is greater than the threshold
+filtered_combined_NW_1 <- combined_data_no_water %>%
+  filter(OD_values <= threshold, Read == "Read 1:450")
+```
+
+```{r echo=FALSE}
+#Getting Rid of Outliers Read 2
+threshold <- 1.0  # Set your threshold value
+
+# Filter out rows where OD is greater than the threshold
+filtered_combined_NW_2 <- combined_data_no_water %>%
+  filter(OD_values <= threshold, Read == "Read 2:600")
+```
+
+
 
 Introduction:
 
-    
-  In multicelluar organisms the microbiome plays a key role in their life cycle and function. Specifically, in plants the microbiome can help increase plant fitness through the ability to
-increase the nutrient uptake. Microbiomes have been found to change over time and can be heavily impacted by environmental factors (O'Brien et al., 2020). A study completed by Ma et al, examined the soil microbiome surrounding hazelnut plants, and found that there were different community compositions across various seasons which led to different nutrients being available to the plants. This suggests that changing environmental factors such as seasonal changes impacted the microbial communities. It has been found that types of microbes are do have specific ecosystems and environments in which they thrive (Grady et al., 2019). Therefore, while we know that seasonal changes impact microbiomes the role in which these changing microbiomes impact their plant hosts is understudied. 
-  To study this gap in knowledge duckweed was used as a model plant. Duckweed is a small floating aquatic plant. It is a great model plant due to it's quick growth rate and short lifespan making it easy to use for generational models as well as studying multiple variables (Laird and Barks, 2018). These plants are susceptible to changes in their environment, due to this the impact of seasonable changes on microbes it is predicted that there will be impacts on the duckweed. The impacts are predicted to be a change in growth of duckweed (measured by area) due to the season the microbiome was collected in.  
+  The complex interaction that occurs between microorganisms and plants plays an important role in supporting the health and functionality of multicellular organisms (O'Brien et al., 2020). In plants, microbial communities significantly enhance fitness through improving nutrient uptake, enhancing stress tolerance, and protecting against pathogens (O'Brien et al. 2020). These relationships are central to ecosystem stability and biodiversity preservation. The benefits of these interactions, are influenced by various environmental factors, including temperature, soil composition, and seasonal changes (Ruan et al. 2023; Santoyo et al., 2021). As climate change continues to reshape Earth’s ecosystems, understanding these interactions has become increasingly critical for developing strategies to maintain biodiversity as well as agricultural productivity. 
+  
+  Seasonal changes in particular, can cause shifts in both the composition and functionality of microbial communities. For example, Ma et al. (2021) found that soil microbiomes surrounding hazelnut plants varied across seasons which in turn altered nutrient availability for the host plants. While it is understood that environmental conditions can reshape microbial communities, the effects of these shifts on the plant hosts remain unclear. It is important to understand these effects and how the overall dynamic changes to be able to predict plant-microbe interactions in fluctuating environements to be able to improve plant fitness. 
+
+  To address this knowledge gap, duckweed (Lemna minor) was used as a model organism. Duckweed is a small, free-floating aquatic plant with a rapid growth rate and short life cycle. These characteristics make it an ideal model for studying generational changes and effects of environmental variables (Thingujam et al., 2024). Because duckweed is sensitive to environmental fluctuations, it provides an excellent system for investigating how seasonal shifts in microbiomes impact plant growth and fitness (). This study hypothesized that microbiomes collected during different seasons will vary in their growth as well as their impact on duckweed growth, as measured by plant area and optical density of microbial communities, reflecting the seasonal shifts in microbial community composition. 
 
 Methods:
 
 1.  Microbe Collection:
 
     Microbes were sampled from two different locations across all four seasons. Seven sample collections were completed at the La Roche sample site, and eight sample collections were completed at the Thompson Farm site. Samples were collected at the edge of a body of water using sterilized metal spatulas . Collection tubes were rinsed in the body of water three times before being used to collect duckweed and the surrounding water.
+```{r, echo=FALSE, warning=FALSE, message=FALSE, fig.cap="Map showing the locations of Thompson Farm and La Roche sampling areas."}
+library(leaflet)
+
+ map <- leaflet() %>% 
+  addTiles() %>% 
+  # Add marker for Thompson Farm with a label
+  addLabelOnlyMarkers(lng = -70.94978753239516, lat = 43.1104921981106770,
+                      label = "Thompson Farm", 
+                      labelOptions = labelOptions(noHide = TRUE, direction = "top")) %>%
+  # Add marker for La Roche with a label
+  addLabelOnlyMarkers(lng =  -70.9460138783696, lat = 43.11948257344687,
+                      label = "La Roche", 
+                      labelOptions = labelOptions(noHide = TRUE, direction = "top")) %>% 
+ setView(lng = -70.947, lat = 43.115, zoom = 14) 
+ 
+saveWidget(map, "map.html")
+ webshot("map.html", file = "map_screenshot.png", vwidth = 800, vheight = 600)
+
+```
 
 2.  Duckweed Line:
 
@@ -31,25 +127,215 @@ Methods:
 4.  Experiment Design and Set Up:
 
     Both axenic duckweed lines were inoculated with each seasonal collection of microbes from both duckweed lines respective sample site. These inoculations were set up with 4 blocks containing 8 replicates each into six 96 well plates according to a randomized blocking map. This allowed for 32 replicates for each treatment. To create the experimental inocula from the microbe samples, 15 mL culture tubes containing sterile yeast mannitol media were inoculated by swabbing with microbes from each combination of site and date. The experimental combinations of these microbes were cultured for two days at an RPM of 300 and at 30ºC. A BioTek Cytation 5 Plate Reader was used to examine optical density at 600 nm for each microbe inocula to test cell concentration. Cell concentrations from the OD readings wree used to dilute all inocula to the same concentration (5000 cells/µl). Dilutions were formed by adding a calculated amount of microbe inocula to sterile Hogland's media in the laminar flow hood. Well plates were prepped by placing 600 µl of sterilized Hogland's media into each well, followed by placing duckweed fronds in each well. A seal (BreathEasier Diversified Biotech) was placed onto each plate and then the plates were left in the sterile laminar flow hood overnight. Each microbe inocula (10 µl) were added to the 96 well plates according to the randomized block design. This was completed by puncturing through the Breatheasier seal. Once all wells were inoculated, the BreathEasier seal was removed and a new seal (BreathEasy Diversified Biotech) was placed onto the plate to prevent contamination. Plates were placed into the growth chamber and imaged on day 12. Images were taken using an iPhone 13 cell phone camera. Images were taken through the plexiglass shield that the plate were set upon to ensure uniform images. ImageJ was used for analysis to measure duckweed growth.
+    
+5. Post Microbe Analysis: 
 
-5.  Statistical Tests:
+After the treatment period, the media containing the microbial samples was analyzed for optical density (OD) using a microplate reader (BioTek Cytation 5 Plate Reader) to assess microbial growth. The optical density was measured at two different wavelengths: 450 nm (OD450) and 600 nm (OD600), to capture both general microbial growth and specific cell concentration. Samples were transferred from experimental plates into a clear bottom 96-well microplate. 
 
-Still working on figuring out exactly which tests that will be the final ones I run. So far have done a Shaprio test and a glm but need to redo the glm models as they don't work with the data that I have. I'm struggling to figure out which tests to run to best analyze the data.
+6.  Statistical Tests:
+
+ Statistical tests were conducted after the experiment to analyze the data. Both OD450 and OD600 wavelengths were initially considered for analysis. A Spearman rank correlation test was conducted to assess the relationship between the two wavelengths, and a strong positive correlation was observed (rho = 0.85, p < 0.001). Based on this high degree of similarity between the two measurements, and given that OD600 is commonly used to assess microbial growth, it was selected for further analysis as it directly reflects the microbial biomass in the samples (Mira et al., 2022). This decision was made to align with standard practice in microbial studies and to ensure the relevance of the measurements to the research goals.
+ 
+To account for the random effects of replicates, a linear mixed model (LMM) was then applied to the log-transformed optical density data. The log transformation was applied based on model fit, as indicated by the AIC criterion. The LMM was used to compare the effects of seasonal microbial treatments against the control group (which contained no microbes) and to evaluate differences between the two plant locations. While the assumption of normality was slightly violated, this was deemed acceptable due to the large sample size (greater than 500 samples), as supported by the Central Limit Theorem. Additionally, a post hoc Tukey test was performed to assess pairwise comparisons between the groups. Given the large sample size, the slight departure from normality was considered negligible, and the results of the Tukey test were interpreted accordingly.
+
+
+Results:
+
+
+```{r, echo=FALSE, warning=FALSE, fig.cap="Relationship between OD450 and OD600 measurements."}
+
+combined_data_NW_NOut_wider <- combined_data_no_water %>%
+  filter(OD_values <= threshold) %>% 
+  pivot_wider(
+    names_from = Read,  # This will use the Wavelength column for new column names
+    values_from = OD_values)   # This will fill the new columns with the corresponding OD values
+
+# Scatterplot for visualizing the relationship between OD450 and OD600
+plot(combined_data_NW_NOut_wider$`Read 1:450`, combined_data_NW_NOut_wider$`Read 2:600`, main = "OD450 vs OD600", xlab = "OD450", ylab = "OD600")
+abline(lm(`Read 1:450` ~ `Read 2:600`, data = combined_data_NW_NOut_wider), col = "red") # Add regression line
+```
+
+```{r, echo=FALSE, warning=FALSE}
+cor_test_result <- cor.test(combined_data_NW_NOut_wider$`Read 1:450`, combined_data_NW_NOut_wider$`Read 2:600`, method = "spearman", conf.level = 0.95)
+
+# Extract relevant values from correlation test result
+cor_coefficient <- cor_test_result$estimate  # Spearman's rho
+p_value <- cor_test_result$p.value
+cor_statistic <- cor_test_result$statistic
+method <- cor_test_result$method
+
+# Create a table of correlation test results with separate rows for confidence interval
+results_table <- data.frame(
+  Statistic = c("Correlation Coefficient", "p-value",
+                "Test Statistic", "Method"),
+  Value = c(cor_coefficient, p_value, cor_statistic, method)
+)
+
+
+
+# Print the table using kable
+knitr::kable(results_table, caption = "Spearman's Rank Correlation Test Results between Variables OD450 and OD600")
+```
+
+```{r, echo=FALSE, fig.cap= "Log mean optical density values by season."}
+
+season_mean_summary <- filtered_combined_NW_2 %>% 
+  group_by(Season) %>% 
+  summarise(
+    mean_log_OD = mean(log(OD_values)),
+    sd_log_OD = sd(log(OD_values)),
+    min_log_OD = min(log(OD_values)),
+    max_log_OD = max(log(OD_values))
+  )
+
+ggplot() +
+  geom_point(data = season_mean_summary, aes(x = Season, y = mean_log_OD, color = Season), 
+             shape = 18, size = 4) +
+  geom_errorbar(data = season_mean_summary, aes(x = Season, ymin = mean_log_OD - sd_log_OD, ymax = mean_log_OD + sd_log_OD), 
+                width = 0.2)  +
+  labs(title = "Mean Log Opitcal Density Values by Season",
+       x = "Season",
+       y = "Log OD Values",
+       color = "Season") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1), legend.position = "none")
+
+```
+
+```{r, echo=FALSE, fig.cap= "Heatmap of optical density by both season and plant location. Lighter colors indicate a lower optical density, with darker colors representing a higher optical density value. Optical density values are non-log transformed. ."}
+ggplot(combined_data_NW_NOut_wider, aes(x = Plant, y = Season, fill = `Read 2:600`)) +
+  geom_tile(color = "black") +  # Add color tiles with white borders
+  scale_fill_gradient(low = "white", high = "darkblue", 
+                      name = "Optical Density") +  # Color scale
+  theme_minimal() +  # Use a minimal theme
+  labs(title = "Heatmap of Optical Density by Season and Location",
+       x = "Location",
+       y = "Season") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))  # Rotate x-axis labels
+```
+
+```{r, echo=FALSE, warning=FALSE}
+# Load necessary libraries
+library(lme4)
+library(broom.mixed)
+
+# Apply log transformation to the OD values
+filtered_combined_NW_2$log_OD_values <- log(filtered_combined_NW_2$OD_values)
+
+# Run the linear mixed model with the log-transformed data
+lmm_result_log_read2 <- lmer(log_OD_values ~ Season + Plant + (1| rep), data = filtered_combined_NW_2)
+
+
+# Extract fixed effects summary
+lmm_summary_read2 <- summary(lmm_result_log_read2)$coefficients
+fixed_effects <- as.data.frame(lmm_summary_read2)
+
+# Rename columns for clarity
+fixed_effects <- fixed_effects %>%
+  rename(
+    `Estimate` = Estimate,
+    `Standard Error` = `Std. Error`,
+    `Degrees of Freedom` = df,
+    `t Value` = `t value`,
+    `p Value` = `Pr(>|t|)`
+  )
+
+# Round numeric values for better presentation
+fixed_effects <- fixed_effects %>%
+  mutate(across(where(is.numeric), ~ signif(.x, 3)))
+
+# Create the table using knitr::kable()
+kable(fixed_effects, 
+      caption = "Fixed Effects of the Linear Mixed Model",
+      format = "latex",  # Use "html" or "latex" for other output formats
+      align = "c") %>%
+  kable_styling(full_width = FALSE, position = "center")
+
+```
+
+```{r, echo=FALSE, warning=FALSE}
+# Calculate estimated marginal means (EMMs)
+emm_season_read2 <- emmeans(lmm_result_log_read2, ~ Season)
+
+# Perform pairwise comparisons with Tukey adjustment
+tukey_results_season_read2 <- pairs(emm_season_read2, adjust = "tukey")
+
+
+# Convert the results to a data frame
+tukey_results_df <- as.data.frame(tukey_results_season_read2)
+
+# Rename columns for clarity
+tukey_results_df <- tukey_results_df %>%
+  rename(
+    `Comparison` = contrast,
+    `Estimate` = estimate,
+    `Standard Error` = SE,
+    `t Ratio` = t.ratio,
+    `p Value` = p.value
+  )
+
+# Round numeric values for better presentation
+tukey_results_df <- tukey_results_df %>%
+  mutate(across(where(is.numeric), ~ signif(.x, 3)))
+
+# Create the table using knitr::kable()
+kable(tukey_results_df, 
+      caption = "Tukey Post Hoc Pairwise Comparisons for Season (Estimated Marginal Means)",
+      format = "latex",  # Use "html" or "latex" depending on the output format
+      align = "c") %>%
+  kable_styling(full_width = FALSE, position = "center")
+```
+
+
+```{r, echo=FALSE, warning=FALSE}
+# Calculate estimated marginal means (EMMs)
+emm_plant_read2 <- emmeans(lmm_result_log_read2, ~ Plant)
+
+# Perform pairwise comparisons with Tukey adjustment
+tukey_results_plant_read2 <- pairs(emm_plant_read2, adjust = "tukey")
+
+
+# Convert the results to a data frame
+tukey_results_df_plant <- as.data.frame(tukey_results_plant_read2)
+
+# Rename columns for clarity
+tukey_results_df_plant <- tukey_results_df_plant %>%
+  rename(
+    `Comparison` = contrast,
+    `Estimate` = estimate,
+    `Standard Error` = SE,
+    `t Ratio` = t.ratio,
+    `p Value` = p.value
+  )
+
+# Round numeric values for better presentation
+tukey_results_df_plant <- tukey_results_df_plant %>%
+  mutate(across(where(is.numeric), ~ signif(.x, 3)))
+
+# Create the table using knitr::kable()
+kable(tukey_results_df_plant, 
+      caption = "Tukey Post Hoc Pairwise Comparisons for Plant (Estimated Marginal Means)",
+      format = "latex",  # Use "html" or "latex" depending on the output format
+      align = "c") %>%
+  kable_styling(full_width = FALSE, position = "center")
+
+```
+
+
+
+Discussion:
+
 
 References:
 
-Grady, K.L., Sorensen, J.W., Stopnisek, N. et al. Assembly and seasonality of core phyllosphere
+Grady, K.L., Sorensen, J.W., Stopnisek, N. et al. Assembly and seasonality of core phyllosphere microbiota on perennial biofuel crops. Nat Commun 10, 4135 (2019).
 
-microbiota on perennial biofuel crops. Nat Commun 10, 4135 (2019).
+Thingujam, D., Pajerowska-Mukhtar, K. M. & Mukhtar, M. S. Duckweed: Beyond an Efficient Plant Model System. Biomolecules 14, 628 (2024).
 
-Laird, R. A. and Barks, P. M. Skimming the surface: duckweed as a model system in 
+Ma, W., Yang, Z., Liang, L., Ma, Q., Wang, G., & Zhao, T. Seasonal Changes in Soil Microbial Community and Co-Occurrence Network of Species of the Genus Corylus. Microorganisms, 9(11), 2228 (2021).
 
-ecology and evolution. Am J Bot 105, 1962–1966  (2018). 
+O’Brien, A.M., Laurich, J., Lash, E. et al. Mutualistic Outcomes Across Plant Populations, Microbes, and Environments in the Duckweed Lemna minor. Microb Ecol 80, 384–397 (2020).
 
-Ma, W., Yang, Z., Liang, L., Ma, Q., Wang, G., & Zhao, T. Seasonal Changes in Soil
+Ruan, Y. et al. Elevated temperature and CO2 strongly affect the growth strategies of soil bacteria. Nat Commun 14, 391 (2023).
 
-Microbial Community and Co-Occurrence Network of Species of the Genus Corylus.
-
-Microorganisms, 9(11), 2228 (2021).
-
-O’Brien, A.M., Laurich, J., Lash, E. et al. Mutualistic Outcomes Across Plant Populations, Microbes, and Environments in the Duckweed Lemna minor. Microb Ecol 80, 384–397 (2020)
+Mira P, Yeh P, Hall BG. Estimating microbial population data from optical density. PLoS One. 10, 13;17 (2022).
